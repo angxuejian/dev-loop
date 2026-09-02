@@ -1,0 +1,25 @@
+{
+  "name": "dev-loop",
+  "version": "1.0.0",
+  "description": "An AI-powered development loop that plans, implements, tests, reviews, and iteratively fixes code until it's ready for human approval.",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "angxuejian",
+  "keywords": [
+    "dev-loop",
+    "ai",
+    "agent"
+  ],
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/angxuejian/dev-loop"
+  },
+  "devDependencies": {
+    "eslint": "^10.9.1",
+    "prettier": "^3.9.6",
+    "typescript": "^7.0.2"
+  }
+}
