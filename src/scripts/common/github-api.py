@@ -170,6 +170,55 @@ def create_pull_request_comment(
         ) from exc
 
 
+def get_pull_request_review_comments(
+    repo: str,
+    pr_number: int,
+    token: str,
+    *,
+    api_url: str = "https://api.github.com",
+    timeout: float = 30,
+) -> list[dict[str, object]]:
+    """Return all inline review comments on a pull request."""
+    parts = repo.split("/")
+    if len(parts) != 2 or not all(parts):
+        raise ValueError("repo must have the form owner/repository")
+    if pr_number <= 0:
+        raise ValueError("pr_number must be positive")
+    if not token:
+        raise ValueError("A GitHub token is required")
+    repository = "/".join(quote(part, safe="") for part in parts)
+    comments: list[dict[str, object]] = []
+    page = 1
+    while True:
+        request = Request(
+            f"{api_url.rstrip('/')}/repos/{repository}/pulls/{pr_number}/comments"
+            f"?per_page=100&page={page}",
+            headers={
+                "Accept": "application/vnd.github+json",
+                "Authorization": f"Bearer {token}",
+                "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "dev-loop-code-review",
+            },
+        )
+        try:
+            with urlopen(request, timeout=timeout) as response:
+                page_comments = json.loads(response.read().decode("utf-8"))
+        except HTTPError as exc:
+            raise RuntimeError(
+                f"Failed to fetch comments for {repo} PR #{pr_number}: HTTP {exc.code}"
+            ) from exc
+        except (URLError, TimeoutError) as exc:
+            raise RuntimeError(
+                f"Failed to fetch comments for {repo} PR #{pr_number}: network error or timeout"
+            ) from exc
+        if not isinstance(page_comments, list):
+            raise TypeError("GitHub returned an invalid pull request comment list")
+        comments.extend(page_comments)
+        if len(page_comments) < 100:
+            return comments
+        page += 1
+
+
 def _gh_request_json(
     hostname: str | None,
     timeout: float,
