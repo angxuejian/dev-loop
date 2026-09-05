@@ -15,4 +15,5 @@ diff = github_api.get_pull_request_diff(
     token,
     api_url=os.environ.get("GITHUB_API_URL", "https://api.github.com"),
 )
+print(diff)
 print(f"Fetched PR diff ({len(diff)} characters).")
