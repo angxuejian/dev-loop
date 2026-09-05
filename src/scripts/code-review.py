@@ -167,8 +167,7 @@ def filter_review_diff(diff: str) -> str:
 
 
 def review_diff(diff: str, llm_api_key: str) -> list[ReviewComment]:
-    """Filter source files, then review their complete diff in one request."""
-    diff = filter_review_diff(diff)
+    """Review the already-filtered source diff in one request."""
 
     print(f"Filtered source diff: {diff} .")
     if not diff.strip():
