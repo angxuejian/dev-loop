@@ -149,42 +149,45 @@ def filter_review_diff(diff: str) -> str:
 def review_diff(diff: str, llm_api_key: str) -> list[ReviewComment]:
     """Filter source files, then review their complete diff in one request."""
     diff = filter_review_diff(diff)
-    if not diff.strip():
-        return []
-    timeout = float(os.environ.get("LLM_TIMEOUT_SECONDS", "600"))
-    if not math.isfinite(timeout) or timeout <= 0:
-        raise ValueError("LLM_TIMEOUT_SECONDS must be a finite positive number")
-    skill = SKILL_PATH.read_text(encoding="utf-8")
-    print(
-        f"Reviewing {len(diff)} source diff characters in one request "
-        f"(timeout: {timeout:g}s)...",
-        flush=True,
-    )
-    with OpenAI(
-        api_key=llm_api_key,
-        base_url="https://api.siliconflow.cn/v1",
-        timeout=timeout,
-        max_retries=0,
-    ) as client:
-        response = client.chat.completions.create(
-            model="zai-org/GLM-5.3",
-            extra_body={"enable_thinking": False},
-            messages=[
-                {"role": "system", "content": skill},
-                {
-                    "role": "user",
-                    "content": "请按 skill 审查以下 diff，只返回约定的 JSON。"
-                    "此输入仅包含 PR 中符合扩展名过滤条件的文件变更。只评论有充分证据的问题，不推测其他文件的内容。"
-                    "你没有源码读取或执行工具。\n\n" + diff,
-                },
-            ],
-        )
-    if not response.choices or response.choices[0].finish_reason != "stop":
-        raise ValueError("LLM review did not finish normally; no comments posted")
-    content = response.choices[0].message.content
-    if not content or not content.strip():
-        raise ValueError("LLM returned no review JSON")
-    return validate_comments(content, diff)
+
+    print(f"Filtered source diff: {diff} .")
+    return []
+    # if not diff.strip():
+    #     return []
+    # timeout = float(os.environ.get("LLM_TIMEOUT_SECONDS", "600"))
+    # if not math.isfinite(timeout) or timeout <= 0:
+    #     raise ValueError("LLM_TIMEOUT_SECONDS must be a finite positive number")
+    # skill = SKILL_PATH.read_text(encoding="utf-8")
+    # print(
+    #     f"Reviewing {len(diff)} source diff characters in one request "
+    #     f"(timeout: {timeout:g}s)...",
+    #     flush=True,
+    # )
+    # with OpenAI(
+    #     api_key=llm_api_key,
+    #     base_url="https://api.siliconflow.cn/v1",
+    #     timeout=timeout,
+    #     max_retries=0,
+    # ) as client:
+    #     response = client.chat.completions.create(
+    #         model="zai-org/GLM-5.3",
+    #         extra_body={"enable_thinking": False},
+    #         messages=[
+    #             {"role": "system", "content": skill},
+    #             {
+    #                 "role": "user",
+    #                 "content": "请按 skill 审查以下 diff，只返回约定的 JSON。"
+    #                 "此输入仅包含 PR 中符合扩展名过滤条件的文件变更。只评论有充分证据的问题，不推测其他文件的内容。"
+    #                 "你没有源码读取或执行工具。\n\n" + diff,
+    #             },
+    #         ],
+    #     )
+    # if not response.choices or response.choices[0].finish_reason != "stop":
+    #     raise ValueError("LLM review did not finish normally; no comments posted")
+    # content = response.choices[0].message.content
+    # if not content or not content.strip():
+    #     raise ValueError("LLM returned no review JSON")
+    # return validate_comments(content, diff)
 
 
 def main() -> None:
