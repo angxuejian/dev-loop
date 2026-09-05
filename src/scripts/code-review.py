@@ -119,18 +119,18 @@ def validate_comments(content: str, diff: str) -> list[ReviewComment]:
 
 def review_diff(diff: str, llm_api_key: str) -> list[ReviewComment]:
     """Load the review skill as instructions and ask GLM for comment JSON."""
-    if not diff.strip():
-        return []
-    diff_ranges(diff)
-    skill = SKILL_PATH.read_text(encoding="utf-8")
+    # if not diff.strip():
+    #     return []
+    # diff_ranges(diff)
+    # skill = SKILL_PATH.read_text(encoding="utf-8")
     timeout = float(os.environ.get("LLM_TIMEOUT_SECONDS", "600"))
-    if not math.isfinite(timeout) or timeout <= 0:
-        raise ValueError("LLM_TIMEOUT_SECONDS must be a finite positive number")
-    print(
-        f"Reviewing {len(diff)} characters with zai-org/GLM-5.3 "
-        f"(request timeout: {timeout:g}s)...",
-        flush=True,
-    )
+    # if not math.isfinite(timeout) or timeout <= 0:
+    #     raise ValueError("LLM_TIMEOUT_SECONDS must be a finite positive number")
+    # print(
+    #     f"Reviewing {len(diff)} characters with zai-org/GLM-5.3 "
+    #     f"(request timeout: {timeout:g}s)...",
+    #     flush=True,
+    # )
     with OpenAI(
         api_key=llm_api_key,
         base_url="https://api.siliconflow.cn/v1",
