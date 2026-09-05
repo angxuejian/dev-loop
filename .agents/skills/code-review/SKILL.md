@@ -1,11 +1,11 @@
 ---
 name: code-review
-description: Review PR diffs returned by github_api.get_pull_request_diff for concrete bugs and actionable code quality issues, returning JSON inline comment arguments for github_api.create_pull_request_comment. Use for reviewing changes without editing code or redesigning intended behavior.
+description: Review PR diffs for high-impact defects and return validated JSON inline comment arguments. Filter medium-warning and lower issues.
 ---
 
 # PR diff review
 
-审查 `src/scripts/common/github-api.py` 中 `get_pull_request_diff()` 返回的 unified diff 文本或保存该文本的文件，输出可供 `create_pull_request_comment()` 使用的行内评论参数。只审查和返回结果，不修改代码，不调用提交评论接口。
+审查 `get_pull_request_diff()` 返回的完整 unified diff，输出可供 `create_pull_request_comment()` 使用的行内评论参数。只审查和返回结果，不修改代码，不调用提交评论接口。
 
 ## 输入与审查范围
 
@@ -14,13 +14,15 @@ description: Review PR diffs returned by github_api.get_pull_request_diff for co
 - 聚焦本次变更新增或暴露的问题。必要时只读检查直接相关的调用者、类型定义、测试和规格；不要扩展为全仓库审计。上下文不足以确认的问题不输出，不声称运行过未执行的检查。
 - 检查语法和类型使用是否导致真实错误、控制流和数据流、空值与边界、异常与资源处理、接口兼容性，以及变更涉及的安全或性能问题。仅在相关代码出现时考虑并发等专门问题，不强行套用检查清单。
 
-## 克制与行为保留
+## 严重性门槛
 
-- 只报告能说明“具体触发条件 → 错误行为 → 实际影响”的高置信度问题。预期行为必须来自需求、契约或代码证据，不能凭个人偏好推定。
-- 不评论单纯命名、排版、个人语法风格、已由工具覆盖的格式问题；语法不合法或类型误用导致代码不能运行则应报告。
-- 冗余设计只有造成具体错误、明显资源浪费或可证实的维护风险时才值得指出；不因“可以更简洁”要求抽象、重构、增加依赖或全面补测试。
-- 尊重明确的业务逻辑变更，不要求恢复旧行为。建议仅描述修复缺陷所需的最小调整，保持原定业务语义；不生成补丁或 GitHub suggestion 代码块。
-- 每个独立根因只评论一次，优先影响较大的问题，不凑数量。没有达到上述标准的问题时返回 `{"comments": []}`；这不代表证明代码绝对正确。
+只报告达到高警告及以上的真实问题。允许报告的级别是：
+
+- `高危险`：可导致数据泄露、凭据泄露、未授权访问、数据破坏或其他重大安全事故。
+- `危险`：可稳定触发的语法错误、运行时崩溃、关键业务失败、严重数据一致性问题或重大性能退化。
+- `高警告`：在明确输入、配置或运行条件下会影响核心功能、造成明显资源耗尽或产生较大范围错误结果的问题。
+
+`中警告`、`低警告`、信息提示以及命名、格式、可读性、轻微重构建议全部过滤，不生成评论。无法说明具体触发条件、实际影响和较高严重性的疑点也必须过滤。宁可返回 `{"comments": []}`，不要为了增加数量降低门槛。
 
 ## 行号与定位
 
@@ -60,31 +62,6 @@ description: Review PR diffs returned by github_api.get_pull_request_diff for co
 }
 ```
 
-上例仅展示格式，路径、行号和问题不得照抄。`body` 默认使用简洁中文，说明触发条件、后果和最小修复方向；不输出赞美、总结、泛泛建议或未经证实的断言。
+上例仅展示格式，路径、行号和问题不得照抄。`body` 默认使用简洁中文，说明触发条件、后果、严重性依据和最小修复方向；不输出赞美、总结、泛泛建议或未经证实的断言。每个输出的问题必须达到高警告、危险或高危险级别。
 
-## 调用代码的接入契约
-
-以下是后续调用方需要实现的约束，不表示当前脚本已经完成集成：
-
-1. 解析 JSON 并检查字段白名单、类型、非空 body、行号范围和 `LEFT/RIGHT`。按同一份 diff 校验路径、hunk 和行号确实存在；校验失败就拒绝该项，不自动猜测或修正位置。
-2. 使用可信运行环境提供 `repo`、`pr_number`、`token`、`api_url`、`timeout` 和 PR head `commit_id`。这些值不交给模型生成，尤其不将凭据放入审查输入。确保 diff 对应要评论的 PR head；head 已变化时重新获取并审查。
-3. 在调用方已获授权发布评论的流程中，对通过校验的项目按如下方式提交。接口负责将 `end_line` 映射为 GitHub 的 `line`，并在多行时添加 `start_side`；skill 不输出这些底层字段。
-
-```python
-for item in review_result["comments"]:
-    # item 必须先通过上述 schema 和 diff 位置校验。
-    github_api.create_pull_request_comment(
-        repo,
-        int(pr_number),
-        token,
-        commit_id=os.environ["PR_HEAD_SHA"],
-        path=item["path"],
-        start_line=item["start_line"],
-        end_line=item["end_line"],
-        side=item["side"],
-        body=item["body"],
-        api_url=os.environ.get("GITHUB_API_URL", "https://api.github.com"),
-    )
-```
-
-空列表不提交评论。提交失败应交由调用方报告；不要因为超时而盲目重复 POST，以免产生重复评论。
+调用方必须在发布前校验 JSON 字段、评论正文、路径和 diff hunk 行号；校验失败时拒绝该项，不猜测或自动修正位置。空列表不提交评论，提交失败时不要盲目重复 POST。
