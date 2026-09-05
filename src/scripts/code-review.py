@@ -140,59 +140,70 @@ def review_diff(diff: str, llm_api_key: str) -> list[ReviewComment]:
         response = client.chat.completions.create(
             model="zai-org/GLM-5.3",
             extra_body={"enable_thinking": False},
+            # messages=[
+            #     {"role": "system", "content": skill},
+            #     {
+            #         "role": "user",
+            #         "content": "请按 skill 审查以下 diff，只返回约定的 JSON。"
+            #         "你只能看到此 diff，没有源码读取或执行工具。\n\n" + diff,
+            #     },
+            # ],
             messages=[
-                {"role": "system", "content": skill},
+                {"role": "system", "content": ""},
                 {
                     "role": "user",
-                    "content": "请按 skill 审查以下 diff，只返回约定的 JSON。"
-                    "你只能看到此 diff，没有源码读取或执行工具。\n\n" + diff,
+                    "content": "你好",
                 },
             ],
         )
     if not response.choices or response.choices[0].finish_reason != "stop":
         raise ValueError("LLM review did not finish normally; no comments posted")
     content = response.choices[0].message.content
+
+    print(content, '::::::::::::::dd')
     if not content or not content.strip():
         raise ValueError("LLM returned no review JSON")
     return validate_comments(content, diff)
 
 
 def main() -> None:
-    repo = os.environ["GITHUB_REPOSITORY"]
-    pr_number = int(os.environ["PR_NUMBER"])
-    token = os.environ["GITHUB_TOKEN"]
-    api_url = os.environ.get("GITHUB_API_URL", "https://api.github.com")
-    head_sha = os.environ["PR_HEAD_SHA"]
-    github_api.assert_pull_request_head(
-        repo, pr_number, token, head_sha, api_url=api_url
-    )
-    diff = github_api.get_pull_request_diff(repo, pr_number, token, api_url=api_url)
-    github_api.assert_pull_request_head(
-        repo, pr_number, token, head_sha, api_url=api_url
-    )
-    print(f"Fetched PR #{pr_number} diff ({len(diff)} characters).", flush=True)
-    if not diff.strip():
-        print("Empty diff; skipping review and comments.")
-        return
-    try:
-        comments = review_diff(diff, os.environ["LLM_API_KEY"])
-    except APITimeoutError:
-        raise SystemExit(
-            "GLM review timed out; no comments posted. "
-            "Retry the CI job or increase LLM_TIMEOUT_SECONDS "
-            "if the service needs more time for this diff."
-        ) from None
-    if not comments:
-        print("No review findings; no comments posted.")
-        return
-    github_api.assert_pull_request_head(
-        repo, pr_number, token, head_sha, api_url=api_url
-    )
-    for item in comments:
-        comment = github_api.create_pull_request_comment(
-            repo, pr_number, token, commit_id=head_sha, api_url=api_url, **item
-        )
-        print(f"Created review comment: {comment['html_url']}")
+    comments = review_diff('', os.environ["LLM_API_KEY"])
+
+    # repo = os.environ["GITHUB_REPOSITORY"]
+    # pr_number = int(os.environ["PR_NUMBER"])
+    # token = os.environ["GITHUB_TOKEN"]
+    # api_url = os.environ.get("GITHUB_API_URL", "https://api.github.com")
+    # head_sha = os.environ["PR_HEAD_SHA"]
+    # github_api.assert_pull_request_head(
+    #     repo, pr_number, token, head_sha, api_url=api_url
+    # )
+    # diff = github_api.get_pull_request_diff(repo, pr_number, token, api_url=api_url)
+    # github_api.assert_pull_request_head(
+    #     repo, pr_number, token, head_sha, api_url=api_url
+    # )
+    # print(f"Fetched PR #{pr_number} diff ({len(diff)} characters).", flush=True)
+    # if not diff.strip():
+    #     print("Empty diff; skipping review and comments.")
+    #     return
+    # try:
+    #     comments = review_diff(diff, os.environ["LLM_API_KEY"])
+    # except APITimeoutError:
+    #     raise SystemExit(
+    #         "GLM review timed out; no comments posted. "
+    #         "Retry the CI job or increase LLM_TIMEOUT_SECONDS "
+    #         "if the service needs more time for this diff."
+    #     ) from None
+    # if not comments:
+    #     print("No review findings; no comments posted.")
+    #     return
+    # github_api.assert_pull_request_head(
+    #     repo, pr_number, token, head_sha, api_url=api_url
+    # )
+    # for item in comments:
+    #     comment = github_api.create_pull_request_comment(
+    #         repo, pr_number, token, commit_id=head_sha, api_url=api_url, **item
+    #     )
+    #     print(f"Created review comment: {comment['html_url']}")
 
 
 if __name__ == "__main__":
