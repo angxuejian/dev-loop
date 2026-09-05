@@ -139,6 +139,7 @@ def review_diff(diff: str, llm_api_key: str) -> list[ReviewComment]:
     ) as client:
         response = client.chat.completions.create(
             model="zai-org/GLM-5.3",
+            extra_body={"enable_thinking": False},
             messages=[
                 {"role": "system", "content": skill},
                 {
