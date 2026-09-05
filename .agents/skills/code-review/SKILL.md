@@ -38,7 +38,7 @@ description: Review PR diffs returned by github_api.get_pull_request_diff for co
 文件头 `---`、`+++` 和 hunk 头不属于代码行。不能使用 diff 文本的第几行、hunk 内偏移或 GitHub 旧式 `position`。
 
 - `path` 是仓库相对路径，去掉 diff 的 `a/`、`b/` 前缀。正确解码 Git 引号路径的转义，不保留外围引号；不得使用 `/dev/null`。重命名文件使用当前新路径，整文件删除使用旧路径。
-- 通常用 `RIGHT` 定位新增代码；由删除引入的问题可用 `LEFT`。选择能解释问题的最小行段，优先变更行，不定位到 diff 未展示的行。
+- 通常用 `RIGHT` 定位新增代码。`LEFT` 只用于删除动作本身引入了可验证回归的情况；如果问题只存在于被删除的旧代码中，且删除已经解决该问题，不得评论这段旧代码。选择能解释问题的最小行段，优先变更行，不定位到 diff 未展示的行。
 - `start_line`、`end_line` 是所选侧文件的正整数行号，包含两端，且 `start_line <= end_line`。单行时两者相等。范围必须位于同一文件、同一 hunk、同一侧，不跨 hunk 或左右两侧。
 - 空 diff、二进制文件或仅元数据变化不能虚构行内评论位置。无法可靠定位的问题不进入评论列表。
 

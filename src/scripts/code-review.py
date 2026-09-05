@@ -196,7 +196,10 @@ def review_diff(diff: str, llm_api_key: str) -> list[ReviewComment]:
                     "role": "user",
                     "content": "请按 skill 审查以下 diff，只返回约定的 JSON。"
                     "此输入仅包含 PR 中符合扩展名过滤条件的文件变更。只评论有充分证据的问题，不推测其他文件的内容。"
-                    "你没有源码读取或执行工具。\n\n" + diff,
+                    "你没有源码读取或执行工具。"
+                    "特别注意：diff 中以 - 开头的 LEFT 行属于旧代码；只有删除动作本身引入了可验证回归时才评论 LEFT 行。"
+                    "如果问题只存在于被删除的旧代码中，且删除已经解决问题，不要输出该评论。\n\n"
+                    + diff,
                 },
             ],
         )
