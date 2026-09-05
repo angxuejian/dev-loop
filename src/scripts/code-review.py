@@ -24,6 +24,32 @@ class ReviewComment(TypedDict):
     body: str
 
 
+def parse_review_json(content: str) -> object:
+    """Parse a model response that should contain exactly one JSON object."""
+    candidate = content.strip()
+    if candidate.startswith("```"):
+        lines = candidate.splitlines()
+        if (
+            lines
+            and lines[0].strip().lower() in {"```", "```json"}
+            and lines[-1].strip() == "```"
+        ):
+            candidate = "\n".join(lines[1:-1]).strip()
+    try:
+        return json.loads(candidate)
+    except json.JSONDecodeError as first_error:
+        start = candidate.find("{")
+        end = candidate.rfind("}")
+        if start >= 0 and end > start:
+            try:
+                return json.loads(candidate[start : end + 1])
+            except json.JSONDecodeError:
+                pass
+        raise ValueError(
+            "LLM response was not valid JSON; expected one object containing comments"
+        ) from first_error
+
+
 def validate_comment_body(body: str, secrets: tuple[str, ...] = ()) -> None:
     """Allow ordinary Markdown, but reject unsafe text without echoing it."""
     if any(
@@ -94,7 +120,7 @@ def diff_ranges(diff: str) -> list[tuple[str, str, int, int]]:
 
 def validate_comments(content: str, diff: str) -> list[ReviewComment]:
     """Reject the entire response before posting if any item is invalid."""
-    result = json.loads(content)
+    result = parse_review_json(content)
     if not isinstance(result, dict) or set(result) != {"comments"}:
         raise ValueError("Review must be a JSON object containing only comments")
     if not isinstance(result["comments"], list):
@@ -194,7 +220,8 @@ def review_diff(diff: str, llm_api_key: str) -> list[ReviewComment]:
                 {"role": "system", "content": skill},
                 {
                     "role": "user",
-                    "content": "请按 skill 审查以下 diff，只返回约定的 JSON。"
+                    "content": "请按 skill 审查以下 diff。最终响应必须严格是一个 JSON 对象，"
+                    "只能包含顶层 comments 数组；禁止 Markdown 代码围栏、解释文字、前后缀或其他字段。"
                     "此输入仅包含 PR 中符合扩展名过滤条件的文件变更。只评论有充分证据的问题，不推测其他文件的内容。"
                     "你没有源码读取或执行工具。"
                     "特别注意：diff 中以 - 开头的 LEFT 行属于旧代码；只有删除动作本身引入了可验证回归时才评论 LEFT 行。"
@@ -202,6 +229,7 @@ def review_diff(diff: str, llm_api_key: str) -> list[ReviewComment]:
                     + diff,
                 },
             ],
+            response_format={"type": "json_object"},
         )
     if not response.choices or response.choices[0].finish_reason != "stop":
         raise ValueError("LLM review did not finish normally; no comments posted")
