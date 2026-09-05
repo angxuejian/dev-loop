@@ -10,14 +10,25 @@ requires-python = ">=3.12"
 dependencies = []
 
 [project.scripts]
-dev-loop = "dev_loop:main"
+dev = "backend:main"
 
 [build-system]
 requires = ["uv_build>=0.12.9,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "backend"
 
 [dependency-groups]
 dev = [
     "pyright>=1.1.411",
     "ruff>=0.16.5",
 ]
+
+[tool.ruff]
+include = ["src/backend/**/*.py", "src/scripts/**/*.py"]
+force-exclude = true
+
+[tool.pyright]
+include = ["src/backend", "src/scripts"]
+exclude = ["**/__pycache__", "**/node_modules", "**/.venv", "**/.*"]
