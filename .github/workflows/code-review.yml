@@ -14,6 +14,7 @@ permissions:
 jobs:
   ai-review:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -34,10 +35,14 @@ jobs:
       #     openai-api-key: ${{ secrets.GLM_LLM_API_KEY }}
       #     responses-api-endpoint: ${{ vars.LLM_BASE_URL }}/responses
 
-      - name: Test SiliconFlow connection
+      - name: Test SiliconFlow auth
+        env:
+          LLM_API_KEY: ${{ secrets.GLM_LLM_API_KEY }}
         run: |
-          curl -v --connect-timeout 10 https://api.siliconflow.cn/v1/models
-          
+          curl -i \
+            -H "Authorization: Bearer $LLM_API_KEY" \
+            https://api.siliconflow.cn/v1/models
+
       - name: Run AI Code review
         env:
           LLM_API_KEY: ${{ secrets.GLM_LLM_API_KEY }}
