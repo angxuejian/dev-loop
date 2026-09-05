@@ -7,19 +7,16 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 
-def get_pull_request_diff(
+def _get_pull_request(
     repo: str,
     pr_number: int,
     token: str,
     *,
+    accept: str,
     api_url: str = "https://api.github.com",
     timeout: float = 30,
 ) -> str:
-    """Return a PR's unified diff, raising RuntimeError if GitHub fails.
-
-    repo is an owner/repository pair. api_url is the GitHub API root,
-    such as GITHUB_API_URL in Actions, rather than the website URL.
-    """
+    """Fetch a PR using the requested response media type."""
     parts = repo.split("/")
     if len(parts) != 2 or not all(parts):
         raise ValueError("repo must have the form owner/repository")
@@ -32,7 +29,7 @@ def get_pull_request_diff(
     request = Request(
         f"{api_url.rstrip('/')}/repos/{repository}/pulls/{pr_number}",
         headers={
-            "Accept": "application/vnd.github.diff",
+            "Accept": accept,
             "Authorization": f"Bearer {token}",
             "X-GitHub-Api-Version": "2022-11-28",
             "User-Agent": "dev-loop-code-review",
@@ -43,12 +40,55 @@ def get_pull_request_diff(
             return response.read().decode("utf-8", errors="replace")
     except HTTPError as exc:
         raise RuntimeError(
-            f"Failed to fetch diff for {repo} PR #{pr_number}: HTTP {exc.code}"
+            f"Failed to fetch {repo} PR #{pr_number}: HTTP {exc.code}"
         ) from exc
     except (URLError, TimeoutError) as exc:
         raise RuntimeError(
-            f"Failed to fetch diff for {repo} PR #{pr_number}: network error or timeout"
+            f"Failed to fetch {repo} PR #{pr_number}: network error or timeout"
         ) from exc
+
+
+def get_pull_request_diff(
+    repo: str,
+    pr_number: int,
+    token: str,
+    *,
+    api_url: str = "https://api.github.com",
+    timeout: float = 30,
+) -> str:
+    """Return the PR unified diff using the GitHub API root URL."""
+    return _get_pull_request(
+        repo,
+        pr_number,
+        token,
+        accept="application/vnd.github.diff",
+        api_url=api_url,
+        timeout=timeout,
+    )
+
+
+def assert_pull_request_head(
+    repo: str,
+    pr_number: int,
+    token: str,
+    expected_sha: str,
+    *,
+    api_url: str = "https://api.github.com",
+    timeout: float = 30,
+) -> None:
+    """Stop a stale CI run before reviewing or posting against a changed PR."""
+    pull_request = json.loads(
+        _get_pull_request(
+            repo,
+            pr_number,
+            token,
+            accept="application/vnd.github+json",
+            api_url=api_url,
+            timeout=timeout,
+        )
+    )
+    if pull_request["head"]["sha"] != expected_sha:
+        raise RuntimeError("PR head changed; rerun review for the current commit")
 
 
 def create_pull_request_comment(
