@@ -3,6 +3,7 @@ import json
 import math
 import os
 import re
+import unicodedata
 from importlib import import_module
 from pathlib import Path
 from typing import Literal, TypedDict, cast
@@ -12,6 +13,7 @@ from openai import APITimeoutError, OpenAI
 github_api = import_module("common.github-api")
 SKILL_PATH = Path(__file__).resolve().parents[2] / ".agents/skills/code-review/SKILL.md"
 REVIEW_FILE_EXTENSIONS = {".py", ".js", ".ts"}
+MAX_COMMENT_BODY_BYTES = 10_000
 
 
 class ReviewComment(TypedDict):
@@ -20,6 +22,19 @@ class ReviewComment(TypedDict):
     end_line: int
     side: Literal["LEFT", "RIGHT"]
     body: str
+
+
+def validate_comment_body(body: str, secrets: tuple[str, ...] = ()) -> None:
+    """Allow ordinary Markdown, but reject unsafe text without echoing it."""
+    if any(
+        unicodedata.category(char) in {"Cc", "Cs"} and char not in "\t\n\r"
+        for char in body
+    ):
+        raise ValueError("Review comment body contains invalid characters")
+    if len(body.encode("utf-8")) > MAX_COMMENT_BODY_BYTES:
+        raise ValueError("Review comment body exceeds the byte limit")
+    if any(secret and secret in body for secret in secrets):
+        raise ValueError("Review comment body contains a runtime credential")
 
 
 def diff_ranges(diff: str) -> list[tuple[str, str, int, int]]:
@@ -105,6 +120,7 @@ def validate_comments(content: str, diff: str) -> list[ReviewComment]:
             or not 1 <= item["start_line"] <= item["end_line"]
         ):
             raise ValueError("Invalid review comment values")
+        validate_comment_body(item["body"])
         if not any(
             item["path"] == path
             and item["side"] == side
@@ -121,10 +137,14 @@ def validate_comments(content: str, diff: str) -> list[ReviewComment]:
 def filter_review_diff(diff: str) -> str:
     """Keep complete textual file diffs for the configured extensions."""
     selected: list[str] = []
-    for file_diff in re.split(r"(?m)(?=^diff --git )", diff):
+    file_header = (
+        r'diff --git (?:a/[^"\r\n]+|"a/(?:\\[^\r\n]|[^"\\\r\n])+") '
+        r'(?:b/[^"\r\n]+|"b/(?:\\[^\r\n]|[^"\\\r\n])+")(?=\r?$)'
+    )
+    for file_diff in re.split(rf"(?m)(?=^{file_header})", diff):
         if not file_diff.strip():
             continue
-        if not file_diff.startswith("diff --git "):
+        if not re.match(file_header, file_diff, re.MULTILINE):
             raise ValueError("Expected a GitHub unified diff file header")
         hunk = re.search(r"(?m)^@@ ", file_diff)
         if hunk is None:
@@ -157,7 +177,7 @@ def review_diff(diff: str, llm_api_key: str) -> list[ReviewComment]:
     if not math.isfinite(timeout) or timeout <= 0:
         raise ValueError("LLM_TIMEOUT_SECONDS must be a finite positive number")
     skill = SKILL_PATH.read_text(encoding="utf-8")
-    print(f"Loaded skill from {skill}.", flush=True)
+    print(f"Loaded skill from {SKILL_PATH}.", flush=True)
     print(
         f"Reviewing {len(diff)} source diff characters in one request "
         f"(timeout: {timeout:g}s)...",
@@ -184,14 +204,13 @@ def review_diff(diff: str, llm_api_key: str) -> list[ReviewComment]:
         )
     if not response.choices or response.choices[0].finish_reason != "stop":
         raise ValueError("LLM review did not finish normally; no comments posted")
-    print(repr(response.choices[0].message.content))
     content = response.choices[0].message.content
     if not content or not content.strip():
         raise ValueError("LLM returned no review JSON")
     return validate_comments(content, diff)
 
 
-def main() -> None:
+def main(llm_api_key: str) -> None:
 
     repo = os.environ["GITHUB_REPOSITORY"]
     pr_number = int(os.environ["PR_NUMBER"])
@@ -202,9 +221,6 @@ def main() -> None:
         repo, pr_number, token, head_sha, api_url=api_url
     )
     diff = github_api.get_pull_request_diff(repo, pr_number, token, api_url=api_url)
-    github_api.assert_pull_request_head(
-        repo, pr_number, token, head_sha, api_url=api_url
-    )
     print(f"Fetched PR #{pr_number} diff ({len(diff)} characters).", flush=True)
     if not diff.strip():
         print("Empty diff; skipping review and comments.")
@@ -218,19 +234,19 @@ def main() -> None:
         )
         return
     try:
-        comments = review_diff(diff, os.environ["LLM_API_KEY"])
+        comments = review_diff(diff, llm_api_key)
     except APITimeoutError:
         raise SystemExit(
-            "GLM review timed out; no comments posted. "
+            "LLM review timed out; no comments posted. "
             "Retry the CI job or increase LLM_TIMEOUT_SECONDS "
             "if the service needs more time for this diff."
         ) from None
     if not comments:
         print("No review findings; no comments posted.")
         return
-    github_api.assert_pull_request_head(
-        repo, pr_number, token, head_sha, api_url=api_url
-    )
+    # Preflight the entire batch so a later invalid body cannot cause partial posts.
+    for item in comments:
+        validate_comment_body(item["body"], (token, llm_api_key))
     for item in comments:
         comment = github_api.create_pull_request_comment(
             repo, pr_number, token, commit_id=head_sha, api_url=api_url, **item
@@ -239,4 +255,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(os.environ["LLM_API_KEY"])
