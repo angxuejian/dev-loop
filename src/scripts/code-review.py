@@ -1,12 +1,13 @@
 import ast
 import json
+import math
 import os
 import re
 from importlib import import_module
 from pathlib import Path
 from typing import Literal, TypedDict, cast
 
-from openai import OpenAI
+from openai import APITimeoutError, OpenAI
 
 github_api = import_module("common.github-api")
 SKILL_PATH = Path(__file__).resolve().parents[2] / ".agents/skills/code-review/SKILL.md"
@@ -122,10 +123,18 @@ def review_diff(diff: str, llm_api_key: str) -> list[ReviewComment]:
         return []
     diff_ranges(diff)
     skill = SKILL_PATH.read_text(encoding="utf-8")
+    timeout = float(os.environ.get("LLM_TIMEOUT_SECONDS", "600"))
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise ValueError("LLM_TIMEOUT_SECONDS must be a finite positive number")
+    print(
+        f"Reviewing {len(diff)} characters with zai-org/GLM-5.3 "
+        f"(request timeout: {timeout:g}s)...",
+        flush=True,
+    )
     with OpenAI(
         api_key=llm_api_key,
         base_url="https://api.siliconflow.cn/v1",
-        timeout=180,
+        timeout=timeout,
         max_retries=0,
     ) as client:
         response = client.chat.completions.create(
@@ -160,11 +169,18 @@ def main() -> None:
     github_api.assert_pull_request_head(
         repo, pr_number, token, head_sha, api_url=api_url
     )
-    print(f"Fetched PR #{pr_number} diff ({len(diff)} characters).")
+    print(f"Fetched PR #{pr_number} diff ({len(diff)} characters).", flush=True)
     if not diff.strip():
         print("Empty diff; skipping review and comments.")
         return
-    comments = review_diff(diff, os.environ["LLM_API_KEY"])
+    try:
+        comments = review_diff(diff, os.environ["LLM_API_KEY"])
+    except APITimeoutError:
+        raise SystemExit(
+            "GLM review timed out; no comments posted. "
+            "Retry the CI job or increase LLM_TIMEOUT_SECONDS "
+            "if the service needs more time for this diff."
+        ) from None
     if not comments:
         print("No review findings; no comments posted.")
         return

@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import httpx
-from openai import OpenAI
+from openai import APITimeoutError, OpenAI
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 review = import_module("code-review")
@@ -35,6 +35,58 @@ COMMENT = {
 
 
 class ReviewTests(unittest.TestCase):
+    def test_timeout_configuration(self):
+        for value, expected in [("600", 600), ("900", 900)]:
+            with (
+                patch.dict(os.environ, {"LLM_TIMEOUT_SECONDS": value}),
+                patch.object(review, "OpenAI") as sdk,
+            ):
+                sdk.return_value.__enter__.return_value.chat.completions.create.return_value = SimpleNamespace(
+                    choices=[
+                        SimpleNamespace(
+                            finish_reason="stop",
+                            message=SimpleNamespace(content='{"comments": []}'),
+                        )
+                    ]
+                )
+                self.assertEqual(review.review_diff(DIFF, "test-key"), [])
+                self.assertEqual(sdk.call_args.kwargs["timeout"], expected)
+        for value in ["0", "-1", "nan", "inf", "invalid"]:
+            with (
+                patch.dict(os.environ, {"LLM_TIMEOUT_SECONDS": value}),
+                patch.object(review, "OpenAI") as sdk,
+            ):
+                with self.assertRaises(ValueError):
+                    review.review_diff(DIFF, "test-key")
+                sdk.assert_not_called()
+
+    def test_timeout_exits_without_posting(self):
+        env = {
+            "GITHUB_REPOSITORY": "owner/repo",
+            "PR_NUMBER": "1",
+            "GITHUB_TOKEN": "test",
+            "PR_HEAD_SHA": "head",
+            "LLM_API_KEY": "key",
+        }
+        with (
+            patch.dict(os.environ, env),
+            patch.object(review.github_api, "assert_pull_request_head"),
+            patch.object(review.github_api, "get_pull_request_diff", return_value=DIFF),
+            patch.object(
+                review,
+                "review_diff",
+                side_effect=APITimeoutError(
+                    request=httpx.Request("POST", "https://example.com")
+                ),
+            ),
+            patch.object(review.github_api, "create_pull_request_comment") as post,
+        ):
+            with self.assertRaisesRegex(
+                SystemExit, "GLM review timed out; no comments posted"
+            ):
+                review.main()
+            post.assert_not_called()
+
     def test_incomplete_or_empty_model_response_fails(self):
         for reason, content in [("length", '{"comments": []}'), ("stop", "")]:
             with patch.object(review, "OpenAI") as sdk:
