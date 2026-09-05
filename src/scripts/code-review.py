@@ -184,6 +184,7 @@ def review_diff(diff: str, llm_api_key: str) -> list[ReviewComment]:
         )
     if not response.choices or response.choices[0].finish_reason != "stop":
         raise ValueError("LLM review did not finish normally; no comments posted")
+    print(repr(response.choices[0].message.content))
     content = response.choices[0].message.content
     if not content or not content.strip():
         raise ValueError("LLM returned no review JSON")
