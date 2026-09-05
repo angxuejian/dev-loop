@@ -1,0 +1,42 @@
+
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    banches:
+      - main
+  
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      
+      - name: Install dependencies
+        run: |
+          pip install -r src/scripts/requirements/code-review.txt
+
+      # - name: Run Codex review
+      #   uses: openai/codex-action@v1
+      #   with:
+      #     openai-api-key: ${{ secrets.GLM_LLM_API_KEY }}
+      #     responses-api-endpoint: ${{ vars.LLM_BASE_URL }}/responses
+
+      - name: Run AI Code review
+        env:
+          LLM_API_KEY: ${{ secrets.GLM_LLM_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python src/scripts/code_review.py
