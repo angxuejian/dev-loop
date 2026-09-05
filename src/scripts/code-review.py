@@ -169,7 +169,6 @@ def filter_review_diff(diff: str) -> str:
 def review_diff(diff: str, llm_api_key: str) -> list[ReviewComment]:
     """Review the already-filtered source diff in one request."""
 
-    print(f"Filtered source diff: {diff} .")
     if not diff.strip():
         return []
     timeout = float(os.environ.get("LLM_TIMEOUT_SECONDS", "600"))
