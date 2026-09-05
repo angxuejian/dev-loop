@@ -43,8 +43,6 @@ Comment JSON:
             prompt,
         ],
         check=False,
-        capture_output=True,
-        text=True,
     )
     if result.returncode != 0:
         print(

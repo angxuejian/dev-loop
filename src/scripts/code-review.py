@@ -106,11 +106,11 @@ def diff_ranges(diff: str) -> list[tuple[str, str, int, int]]:
             remaining_old = int(match[2]) if match[2] is not None else 1
             remaining_new = int(match[4]) if match[4] is not None else 1
             path = old_path if new_path == "/dev/null" else new_path
-            for side, start, count in (
-                ("LEFT", old_start, remaining_old),
-                ("RIGHT", new_start, remaining_new),
+            for side, side_path, start, count in (
+                ("LEFT", old_path, old_start, remaining_old),
+                ("RIGHT", new_path, new_start, remaining_new),
             ):
-                if count:
+                if count and side_path != "/dev/null":
                     ranges.append((path, side, start, start + count - 1))
             in_hunk = True
     if remaining_old or remaining_new:
