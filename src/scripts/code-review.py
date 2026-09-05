@@ -11,6 +11,7 @@ from openai import APITimeoutError, OpenAI
 
 github_api = import_module("common.github-api")
 SKILL_PATH = Path(__file__).resolve().parents[2] / ".agents/skills/code-review/SKILL.md"
+REVIEW_FILE_EXTENSIONS = {".py", ".js", ".ts"}
 
 
 class ReviewComment(TypedDict):
@@ -117,126 +118,48 @@ def validate_comments(content: str, diff: str) -> list[ReviewComment]:
     return comments
 
 
-def render_hunk(
-    header: str, old: int, new: int, body: str, old_size: int, new_size: int
-) -> str:
-    """Render a fragment with original file coordinates and updated counts."""
-    old_start = old if old_size else max(0, old - 1)
-    new_start = new if new_size else max(0, new - 1)
-    return header + f"@@ -{old_start},{old_size} +{new_start},{new_size} @@\n" + body
-
-
-def split_diff_batches(diff: str, max_chars: int) -> list[str]:
-    """Pack files/hunks; split oversized hunks at lines with original coordinates."""
-    if max_chars <= 0:
-        raise ValueError("LLM_BATCH_MAX_CHARS must be positive")
-    diff_ranges(diff)
-    units: list[str] = []
-    files = re.split(r"(?m)(?=^diff --git )", diff)
-    for file_diff in files:
+def filter_review_diff(diff: str) -> str:
+    """Keep complete textual file diffs for the configured extensions."""
+    selected: list[str] = []
+    for file_diff in re.split(r"(?m)(?=^diff --git )", diff):
         if not file_diff.strip():
             continue
         if not file_diff.startswith("diff --git "):
             raise ValueError("Expected a GitHub unified diff file header")
-        hunks = list(re.finditer(r"(?m)^@@ .*", file_diff))
-        if not hunks:
-            print(f"Skipping non-text change: {file_diff.splitlines()[0]}", flush=True)
+        hunk = re.search(r"(?m)^@@ ", file_diff)
+        if hunk is None:
             continue
-        if len(file_diff) <= max_chars:
-            units.append(file_diff)
-            continue
-        header = file_diff[: hunks[0].start()]
-        for i, match in enumerate(hunks):
-            end = hunks[i + 1].start() if i + 1 < len(hunks) else len(file_diff)
-            hunk = file_diff[match.start() : end]
-            if len(header + hunk) <= max_chars:
-                units.append(header + hunk)
-                continue
-            coordinates = re.match(r"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@", hunk)
-            if coordinates is None:
-                raise ValueError("Invalid hunk coordinates")
-            old, new = int(coordinates[1]), int(coordinates[2])
-            # Keep no-newline markers attached to their preceding code line.
-            records: list[str] = []
-            for line in hunk.splitlines(keepends=True)[1:]:
-                if line.startswith("\\ No newline at end of file") and records:
-                    records[-1] += line
+        headers = file_diff[: hunk.start()].splitlines()
+        old_path = new_path = ""
+        for line in headers:
+            if line.startswith(("--- ", "+++ ")):
+                path = line[4:]
+                if path.startswith('"'):
+                    path = ast.literal_eval("b" + path).decode("utf-8")
+                if line.startswith("--- "):
+                    old_path = path
                 else:
-                    records.append(line)
-            chunk = ""
-            old_count = new_count = 0
-
-            # Zero-count original sides point to the preceding line already.
-            original = re.match(r"@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@", hunk)
-            if original and original[1] == "0":
-                old += 1
-            if original and original[2] == "0":
-                new += 1
-            for record in records:
-                add_old = int(record.startswith((" ", "-")))
-                add_new = int(record.startswith((" ", "+")))
-                if (
-                    chunk
-                    and len(
-                        render_hunk(
-                            header,
-                            old,
-                            new,
-                            chunk + record,
-                            old_count + add_old,
-                            new_count + add_new,
-                        )
-                    )
-                    > max_chars
-                ):
-                    units.append(
-                        render_hunk(header, old, new, chunk, old_count, new_count)
-                    )
-                    old += old_count
-                    new += new_count
-                    chunk = ""
-                    old_count = new_count = 0
-                if (
-                    len(
-                        render_hunk(
-                            header,
-                            old,
-                            new,
-                            chunk + record,
-                            old_count + add_old,
-                            new_count + add_new,
-                        )
-                    )
-                    > max_chars
-                ):
-                    raise ValueError(
-                        "One diff line plus headers exceeds LLM_BATCH_MAX_CHARS; increase the limit"
-                    )
-                chunk += record
-                old_count += add_old
-                new_count += add_new
-            if chunk:
-                units.append(render_hunk(header, old, new, chunk, old_count, new_count))
-    batches: list[str] = []
-    current = ""
-    for unit in units:
-        separator = "\n" if current and not current.endswith("\n") else ""
-        if current and len(current + separator + unit) > max_chars:
-            batches.append(current)
-            current = ""
-            separator = ""
-        current += separator + unit
-    if current:
-        batches.append(current)
-    for batch in batches:
-        diff_ranges(batch)
-    return batches
+                    new_path = path
+        path = old_path if new_path == "/dev/null" else new_path
+        if Path(path).suffix in REVIEW_FILE_EXTENSIONS:
+            selected.append(file_diff)
+    return "".join(selected)
 
 
-def review_batch(
-    diff: str, llm_api_key: str, skill: str, timeout: float
-) -> list[ReviewComment]:
-    """Review one bounded batch without publishing any comments."""
+def review_diff(diff: str, llm_api_key: str) -> list[ReviewComment]:
+    """Filter source files, then review their complete diff in one request."""
+    diff = filter_review_diff(diff)
+    if not diff.strip():
+        return []
+    timeout = float(os.environ.get("LLM_TIMEOUT_SECONDS", "600"))
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise ValueError("LLM_TIMEOUT_SECONDS must be a finite positive number")
+    skill = SKILL_PATH.read_text(encoding="utf-8")
+    print(
+        f"Reviewing {len(diff)} source diff characters in one request "
+        f"(timeout: {timeout:g}s)...",
+        flush=True,
+    )
     with OpenAI(
         api_key=llm_api_key,
         base_url="https://api.siliconflow.cn/v1",
@@ -250,8 +173,8 @@ def review_batch(
                 {"role": "system", "content": skill},
                 {
                     "role": "user",
-                    "content": "请按 skill 审查以下 diff 批次，只返回约定的 JSON。"
-                    "这是完整 PR 的一部分，只评论本批次中有充分证据的问题，不推测缺失上下文。"
+                    "content": "请按 skill 审查以下 diff，只返回约定的 JSON。"
+                    "此输入仅包含 PR 中符合扩展名过滤条件的文件变更。只评论有充分证据的问题，不推测其他文件的内容。"
                     "你没有源码读取或执行工具。\n\n" + diff,
                 },
             ],
@@ -262,30 +185,6 @@ def review_batch(
     if not content or not content.strip():
         raise ValueError("LLM returned no review JSON")
     return validate_comments(content, diff)
-
-
-def review_diff(diff: str, llm_api_key: str) -> list[ReviewComment]:
-    if not diff.strip():
-        return []
-    timeout = float(os.environ.get("LLM_TIMEOUT_SECONDS", "600"))
-    if not math.isfinite(timeout) or timeout <= 0:
-        raise ValueError("LLM_TIMEOUT_SECONDS must be a finite positive number")
-    limit = int(os.environ.get("LLM_BATCH_MAX_CHARS", "12000"))
-    batches = split_diff_batches(diff, limit)
-    skill = SKILL_PATH.read_text(encoding="utf-8")
-    comments: list[ReviewComment] = []
-    for index, batch in enumerate(batches, 1):
-        print(
-            f"Reviewing batch {index}/{len(batches)}: {len(batch)} diff characters "
-            f"(timeout: {timeout:g}s)...",
-            flush=True,
-        )
-        result = review_batch(batch, llm_api_key, skill, timeout)
-        for item in result:
-            if item not in comments:
-                comments.append(item)
-    # Recheck against the complete PR before allowing publication.
-    return validate_comments(json.dumps({"comments": comments}), diff)
 
 
 def main() -> None:
@@ -305,6 +204,14 @@ def main() -> None:
     print(f"Fetched PR #{pr_number} diff ({len(diff)} characters).", flush=True)
     if not diff.strip():
         print("Empty diff; skipping review and comments.")
+        return
+    diff = filter_review_diff(diff)
+    print(f"Filtered source diff: {len(diff)} characters.", flush=True)
+    if not diff.strip():
+        print(
+            f"No text changes matching {sorted(REVIEW_FILE_EXTENSIONS)}; "
+            "skipping review and comments."
+        )
         return
     try:
         comments = review_diff(diff, os.environ["LLM_API_KEY"])
