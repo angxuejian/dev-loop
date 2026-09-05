@@ -39,5 +39,6 @@ jobs:
           LLM_API_KEY: ${{ secrets.GLM_LLM_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           python src/scripts/code-review.py
