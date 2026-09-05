@@ -5,7 +5,7 @@ description: Review PR diffs for high-impact defects and return validated JSON i
 
 # PR diff review
 
-审查 `get_pull_request_diff()` 返回的完整 unified diff，输出可供 `create_pull_request_comment()` 使用的行内评论参数。只审查和返回结果，不修改代码，不调用提交评论接口。
+审查 `get_pull_request_diff()` 返回的完整 unified diff，输出可供 `create_pull_request_comment()` 使用的行内评论参数。只审查和返回结果，不修改代码，不调用提交评论接口。不要为了增加评论数量降低严重性门槛
 
 ## 输入与审查范围
 
@@ -46,12 +46,13 @@ description: Review PR diffs for high-impact defects and return validated JSON i
 
 ## 输出契约
 
-成功完成审查时只返回一个 JSON 对象，不带 Markdown 围栏或额外解释。顶层仅含 `comments` 数组；每项严格包含以下五个字段，不添加置信度、严重级别或运行参数字段：
+成功完成审查时只返回一个 JSON 对象，不带 Markdown 围栏或额外解释。顶层仅含 `comments` 数组；每项严格包含以下六个字段：
 
 ```json
 {
   "comments": [
     {
+      "severity": "HIGH_WARNING",
       "path": "src/backend/example.py",
       "start_line": 24,
       "end_line": 25,
@@ -62,6 +63,6 @@ description: Review PR diffs for high-impact defects and return validated JSON i
 }
 ```
 
-上例仅展示格式，路径、行号和问题不得照抄。`body` 默认使用简洁中文，说明触发条件、后果、严重性依据和最小修复方向；不输出赞美、总结、泛泛建议或未经证实的断言。每个输出的问题必须达到高警告、危险或高危险级别。
+上例仅展示格式，路径、行号和问题不得照抄。`severity` 只能使用 `HIGH_WARNING`、`DANGER` 或 `HIGH_DANGER`；中警告及以下的问题不输出。`body` 默认使用简洁中文，说明触发条件、后果、严重性依据和最小修复方向；不输出赞美、总结、泛泛建议或未经证实的断言。
 
 调用方必须在发布前校验 JSON 字段、评论正文、路径和 diff hunk 行号；校验失败时拒绝该项，不猜测或自动修正位置。空列表不提交评论，提交失败时不要盲目重复 POST。

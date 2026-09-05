@@ -17,6 +17,7 @@ MAX_COMMENT_BODY_BYTES = 10_000
 
 
 class ReviewComment(TypedDict):
+    severity: Literal["HIGH_WARNING", "DANGER", "HIGH_DANGER"]
     path: str
     start_line: int
     end_line: int
@@ -129,6 +130,7 @@ def validate_comments(content: str, diff: str) -> list[ReviewComment]:
     comments: list[ReviewComment] = []
     for item in result["comments"]:
         if not isinstance(item, dict) or set(item) != {
+            "severity",
             "path",
             "start_line",
             "end_line",
@@ -140,6 +142,7 @@ def validate_comments(content: str, diff: str) -> list[ReviewComment]:
             not isinstance(item["path"], str)
             or not isinstance(item["body"], str)
             or not item["body"].strip()
+            or item["severity"] not in {"HIGH_WARNING", "DANGER", "HIGH_DANGER"}
             or item["side"] not in ("LEFT", "RIGHT")
             or type(item["start_line"]) is not int
             or type(item["end_line"]) is not int
@@ -236,6 +239,8 @@ def review_diff(
                     "role": "user",
                     "content": "请按 skill 审查以下 diff。最终响应必须严格是一个 JSON 对象，"
                     "只能包含顶层 comments 数组；禁止 Markdown 代码围栏、解释文字、前后缀或其他字段。"
+                    "每条评论必须包含 severity 字段，值只能是 HIGH_WARNING、DANGER 或 HIGH_DANGER；"
+                    "无法达到 HIGH_WARNING 的问题不要输出。"
                     "此输入仅包含 PR 中符合扩展名过滤条件的文件变更。只评论有充分证据的问题，不推测其他文件的内容。"
                     "你没有源码读取或执行工具。"
                     "特别注意：diff 中以 - 开头的 LEFT 行属于旧代码；只有删除动作本身引入了可验证回归时才评论 LEFT 行。"
@@ -300,7 +305,16 @@ def main(llm_api_key: str) -> None:
         validate_comment_body(item["body"], (token, llm_api_key))
     for item in comments:
         comment = github_api.create_pull_request_comment(
-            repo, pr_number, token, commit_id=head_sha, api_url=api_url, **item
+            repo,
+            pr_number,
+            token,
+            commit_id=head_sha,
+            api_url=api_url,
+            path=item["path"],
+            start_line=item["start_line"],
+            end_line=item["end_line"],
+            side=item["side"],
+            body=item["body"],
         )
         print(f"Created review comment: {comment['html_url']}")
 
