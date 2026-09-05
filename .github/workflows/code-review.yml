@@ -4,7 +4,7 @@ name: AI Code Review
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    banches:
+    branches:
       - main
   
 permissions:
@@ -38,5 +38,6 @@ jobs:
         env:
           LLM_API_KEY: ${{ secrets.GLM_LLM_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          python src/scripts/code_review.py
+          python src/scripts/code-review.py
