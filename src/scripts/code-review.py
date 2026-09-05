@@ -231,7 +231,7 @@ def review_diff(
         max_retries=0,
     ) as client:
         response = client.chat.completions.create(
-            model="deepseek-ai/DeepSeek-V4-Pro",
+            model="moonshotai/Kimi-K2.7-Code",
             extra_body={"enable_thinking": False},
             messages=[
                 {"role": "system", "content": skill},
