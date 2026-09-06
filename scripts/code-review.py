@@ -9,14 +9,18 @@ from importlib import import_module
 from pathlib import Path
 from typing import Literal, TypedDict, cast
 
+from common.config import (
+    BASE_URL,
+    MAX_COMMENT_BODY_BYTES,
+    MODEL,
+    REVIEW_DIRECTORIES,
+    REVIEW_FILE_EXTENSIONS,
+)
 from openai import APITimeoutError, OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 
 github_api = import_module("common.github-api")
 SKILL_PATH = Path(__file__).resolve().parents[1] / ".agents/skills/code-review/SKILL.md"
-REVIEW_FILE_EXTENSIONS = {".py", ".js", ".ts"}
-REVIEW_DIRECTORIES = {"backend", "frontend"}
-MAX_COMMENT_BODY_BYTES = 10_000
 
 
 class ReviewComment(TypedDict):
@@ -256,12 +260,12 @@ def review_diff(
     )
     with OpenAI(
         api_key=llm_api_key,
-        base_url="https://api.siliconflow.cn/v1",
+        base_url=BASE_URL,
         timeout=timeout,
         max_retries=0,
     ) as client:
         response = client.chat.completions.create(
-            model="moonshotai/Kimi-K2.7-Code",
+            model=MODEL,
             extra_body={"enable_thinking": False},
             messages=messages,
             response_format={"type": "json_object"},
