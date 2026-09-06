@@ -2,6 +2,13 @@
 
 An AI-powered development loop that plans, implements, tests, reviews, and iteratively fixes code until it's ready for human approval.
 
+## Project structure
+
+- `backend/`: Python backend package.
+- `frontend/`: Frontend source files.
+- `scripts/`: Development automation and code review scripts.
+- `features/`: Feature specifications.
+
 ## quick start
 
 1. Install Nodejs and Python dependencies:

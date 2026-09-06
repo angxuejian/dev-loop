@@ -11,6 +11,15 @@
     "types": []
   },
   "references": [],
-  "include": ["src/**/*.js", "src/**/*.ts"],
+  "include": [
+    "backend/**/*.js",
+    "backend/**/*.ts",
+    "frontend/**/*.js",
+    "frontend/**/*.ts",
+    "scripts/**/*.js",
+    "scripts/**/*.ts",
+    "features/**/*.js",
+    "features/**/*.ts"
+  ],
   "exclude": ["node_modules"]
 }
