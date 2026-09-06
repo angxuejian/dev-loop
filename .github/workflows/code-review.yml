@@ -29,20 +29,6 @@ jobs:
         run: |
           pip install -r scripts/requirements/code-review.txt
 
-      # - name: Run Codex review
-      #   uses: openai/codex-action@v1
-      #   with:
-      #     openai-api-key: ${{ secrets.GLM_LLM_API_KEY }}
-      #     responses-api-endpoint: ${{ vars.LLM_BASE_URL }}/responses
-
-      - name: Test SiliconFlow auth
-        env:
-          LLM_API_KEY: ${{ secrets.GLM_LLM_API_KEY }}
-        run: |
-          curl -i \
-            -H "Authorization: Bearer $LLM_API_KEY" \
-            https://api.siliconflow.cn/v1/models
-
       - name: Run AI Code review
         env:
           LLM_API_KEY: ${{ secrets.GLM_LLM_API_KEY }}
