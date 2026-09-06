@@ -58,6 +58,7 @@ An AI-powered development loop that plans, implements, tests, reviews, and itera
    ```
 
 5. Execute the `implement` skill to implement the feature specification.
+
    ```bash
    $implement features/001-async-task.md
    ```
@@ -76,9 +77,9 @@ An AI-powered development loop that plans, implements, tests, reviews, and itera
 
 - `scripts/code-review.py`: Run AI code review for a pull request.
 - `scripts/code-fix.py`: Wait for review feedback and fix unresolved comments.
+- `scripts/build-pages.mjs`: Build all standalone frontend applications for GitHub Pages.
 - `scripts/common/config.py`: Configure the code review provider and review scope.
 - `scripts/common/github-api.py`: Shared GitHub API helpers.
 - `scripts/requirements/code-review.txt`: Dependencies for the code review workflow.
-
 
 > This project uses `Codex CLI` with models provided by `SiliconFlow`.

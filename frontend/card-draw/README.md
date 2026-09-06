@@ -16,3 +16,5 @@ npm run test:card-draw
 ```
 
 测试使用固定随机输入验证概率边界、卡池选择、保底触发及计数重置。
+
+合入 `main` 后，GitHub Actions 会将该页面部署到仓库 Pages 站点的 `/dev-loop/card-draw/` 路径。其他包含 `index.html` 的 `frontend/<目录名>/` 也会自动发布到 `/dev-loop/<目录名>/`。
