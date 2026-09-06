@@ -6,7 +6,9 @@
   "scripts": {
     "lint": "eslint \"{backend,frontend,scripts,features}/**/*.{js,ts}\" --fix --no-error-on-unmatched-pattern",
     "format": "prettier --write \"{backend,frontend,scripts,features}/**/*.{js,ts,json,md}\" --no-error-on-unmatched-pattern",
-    "typecheck": "tsc --project tsconfig.json"
+    "typecheck": "tsc --project tsconfig.json",
+    "card-draw": "tsc --project frontend/card-draw/tsconfig.json && python3 -m http.server 8000 --bind 127.0.0.1 --directory frontend/card-draw",
+    "test:card-draw": "tsc --project frontend/card-draw/tsconfig.json && node --test frontend/card-draw/draw.test.mjs"
   },
   "author": "angxuejian",
   "keywords": [
