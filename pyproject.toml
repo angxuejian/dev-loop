@@ -21,6 +21,7 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-name = "backend"
+module-root = ""
 
 [dependency-groups]
 dev = [
@@ -29,9 +30,9 @@ dev = [
 ]
 
 [tool.ruff]
-include = ["src/backend/**/*.py", "src/scripts/**/*.py"]
+include = ["backend/**/*.py", "scripts/**/*.py"]
 force-exclude = true
 
 [tool.pyright]
-include = ["src/backend", "src/scripts"]
+include = ["backend", "scripts"]
 exclude = ["**/__pycache__", "**/node_modules", "**/.venv", "**/.*"]

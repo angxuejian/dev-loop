@@ -32,7 +32,7 @@ description: Fix concrete issues reported in unresolved GitHub pull request revi
 [
   {
     "databaseId": 3940221907,
-    "path": "src/scripts/code-review.py",
+    "path": "scripts/code-review.py",
     "line": 169,
     "status": "fixed",
     "summary": "在提交评论前增加 body 长度和敏感凭据校验。"

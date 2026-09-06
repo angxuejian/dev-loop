@@ -27,7 +27,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install -r src/scripts/requirements/code-review.txt
+          pip install -r scripts/requirements/code-review.txt
 
       # - name: Run Codex review
       #   uses: openai/codex-action@v1
@@ -50,4 +50,4 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          python src/scripts/code-review.py
+          python scripts/code-review.py

@@ -53,7 +53,7 @@ description: Review PR diffs for high-impact defects and return validated JSON i
   "comments": [
     {
       "severity": "HIGH_WARNING",
-      "path": "src/backend/example.py",
+      "path": "backend/example.py",
       "start_line": 24,
       "end_line": 25,
       "side": "RIGHT",

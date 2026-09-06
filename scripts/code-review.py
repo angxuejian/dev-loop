@@ -11,7 +11,7 @@ from typing import Literal, TypedDict, cast
 from openai import APITimeoutError, OpenAI
 
 github_api = import_module("common.github-api")
-SKILL_PATH = Path(__file__).resolve().parents[2] / ".agents/skills/code-review/SKILL.md"
+SKILL_PATH = Path(__file__).resolve().parents[1] / ".agents/skills/code-review/SKILL.md"
 REVIEW_FILE_EXTENSIONS = {".py", ".js", ".ts"}
 MAX_COMMENT_BODY_BYTES = 10_000
 

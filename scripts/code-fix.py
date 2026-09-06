@@ -12,7 +12,7 @@ from importlib import import_module
 from pathlib import Path
 
 github_api = import_module("common.github-api")
-SKILL_PATH = Path(__file__).resolve().parents[2] / ".agents/skills/code-fix/SKILL.md"
+SKILL_PATH = Path(__file__).resolve().parents[1] / ".agents/skills/code-fix/SKILL.md"
 
 
 def run_codex_fix(comment: dict[str, object]) -> bool:

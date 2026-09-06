@@ -4,11 +4,11 @@ import tseslint from "typescript-eslint";
 
 export default defineConfig([
   {
-    files: ["src/**/*.js"],
+    files: ["{backend,frontend,scripts,features}/**/*.js"],
     extends: [js.configs.recommended],
   },
   {
-    files: ["src/**/*.ts"],
+    files: ["{backend,frontend,scripts,features}/**/*.ts"],
     extends: [tseslint.configs.recommended],
   },
 ]);

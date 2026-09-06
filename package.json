@@ -4,8 +4,8 @@
   "description": "An AI-powered development loop that plans, implements, tests, reviews, and iteratively fixes code until it's ready for human approval.",
   "type": "module",
   "scripts": {
-    "lint": "eslint \"src/**/*.{js,ts}\" --fix --no-error-on-unmatched-pattern",
-    "format": "prettier --write \"src/**/*.{js,ts,json,md}\" --no-error-on-unmatched-pattern",
+    "lint": "eslint \"{backend,frontend,scripts,features}/**/*.{js,ts}\" --fix --no-error-on-unmatched-pattern",
+    "format": "prettier --write \"{backend,frontend,scripts,features}/**/*.{js,ts,json,md}\" --no-error-on-unmatched-pattern",
     "typecheck": "tsc --project tsconfig.json"
   },
   "author": "angxuejian",
