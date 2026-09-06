@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { buildPages } from "../build-pages.mjs";
+import { buildPages } from "../../scripts/build-pages.mjs";
 
 test("packages every direct frontend application and excludes development files", async (context) => {
   const fixture = await mkdtemp(join(tmpdir(), "dev-loop-pages-"));

@@ -8,7 +8,6 @@ on:
       - ".github/workflows/deploy-pages.yml"
       - "frontend/**"
       - "scripts/build-pages.mjs"
-      - "scripts/tests/build-pages.test.mjs"
       - "package.json"
       - "package-lock.json"
       - "tsconfig.json"
