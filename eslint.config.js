@@ -3,6 +3,7 @@ import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
 
 export default defineConfig([
+  { ignores: ["frontend/card-draw/.build/**"] },
   {
     files: ["{backend,frontend,scripts,features}/**/*.js"],
     extends: [js.configs.recommended],

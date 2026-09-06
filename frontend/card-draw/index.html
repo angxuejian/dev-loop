@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>星间卡藏 · 卡牌抽取</title>
+    <link rel="stylesheet" href="./style.css" />
+    <script type="module" src="./.build/main.js"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="brand">✦ 星间卡藏</span
+        ><span class="edition">STELLAR COLLECTION / 01</span>
+      </header>
+      <section class="intro">
+        <p class="eyebrow">一张卡牌，一次相遇</p>
+        <h1>你的下一束星光</h1>
+        <p>轻触抽卡，发现星河中的小小惊喜。</p>
+      </section>
+      <div class="layout">
+        <section class="stage" aria-label="本次抽卡结果">
+          <article id="card" class="card" data-rarity="empty">
+            <span id="rarity" class="rarity">等待揭晓</span>
+            <div id="symbol" class="symbol" aria-hidden="true">✦</div>
+            <div class="card-copy">
+              <p class="eyebrow">STELLAR COLLECTION</p>
+              <h2 id="card-name">未知的相遇</h2>
+              <p id="description">属于你的卡牌，正在星光中等待。</p>
+            </div>
+          </article>
+          <p class="stage-caption">每一次相遇，都值得珍藏</p>
+        </section>
+        <section class="controls" aria-label="抽卡操作与规则">
+          <p class="eyebrow">常驻卡池</p>
+          <h2>星光邂逅</h2>
+          <p class="muted">
+            六张卡牌，三种稀有度。<br />让一点好运，为今天增添光彩。
+          </p>
+          <div class="rates" aria-label="基础概率">
+            <div>
+              <span class="r">R</span><strong>80<span>%</span></strong>
+            </div>
+            <div>
+              <span class="sr">SR</span><strong>18<span>%</span></strong>
+            </div>
+            <div>
+              <span class="ssr">SSR</span><strong>2<span>%</span></strong>
+            </div>
+          </div>
+          <div class="pity">
+            <div class="pity-label">
+              <span>连续未出 SSR</span
+              ><span><b id="counter">0</b> / 50 抽</span>
+            </div>
+            <progress
+              id="progress"
+              max="50"
+              value="0"
+              aria-label="连续未出 SSR 次数"
+            ></progress>
+            <p>
+              连续 49 抽未出 SSR，下一抽必得。<br />抽到任意 SSR
+              后，保底计数归零。
+            </p>
+          </div>
+          <button id="draw" type="button">
+            抽取一张 <span aria-hidden="true">✦</span>
+          </button>
+          <p id="status" role="status" aria-live="polite" aria-atomic="true">
+            准备好迎接第一张卡牌了吗？
+          </p>
+        </section>
+      </div>
+      <footer>
+        <span>✧ 愿每一次抽取都有惊喜</span
+        ><span>仅作体验 · 刷新页面后进度重置</span>
+      </footer>
+    </main>
+  </body>
+</html>
