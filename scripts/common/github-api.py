@@ -283,6 +283,68 @@ def get_current_repository(*, timeout: float = 30) -> str:
     return _gh_request_value("repo view", "nameWithOwner", timeout=timeout)
 
 
+def create_pull_request(
+    repo: str,
+    *,
+    title: str,
+    body: str,
+    head: str,
+    base: str,
+    draft: bool = False,
+    hostname: str | None = None,
+    timeout: float = 30,
+) -> str:
+    """Create a PR from an already-pushed head branch and return its URL."""
+    parts = repo.split("/")
+    if len(parts) != 2 or not all(parts):
+        raise ValueError("repo must have the form owner/repository")
+    if not title.strip() or not head.strip() or not base.strip():
+        raise ValueError("title, head and base must not be empty")
+    repository = f"{hostname}/{repo}" if hostname else repo
+    command = [
+        "gh",
+        "pr",
+        "create",
+        "--repo",
+        repository,
+        "--title",
+        title,
+        "--body-file",
+        "-",
+        "--head",
+        head,
+        "--base",
+        base,
+    ]
+    if draft:
+        command.append("--draft")
+    try:
+        response = subprocess.run(
+            command,
+            input=body,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=timeout,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            "GitHub CLI (gh) is required; install it and run gh auth login"
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(
+            f"Failed to create pull request: {exc.stderr.strip()}"
+        ) from exc
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            "PR creation timed out; check GitHub before retrying"
+        ) from exc
+    url = response.stdout.strip()
+    if not url:
+        raise RuntimeError("GitHub CLI returned no pull request URL")
+    return url
+
+
 def get_current_pull_request_number(*, timeout: float = 30) -> int:
     """Return the PR number associated with the current branch."""
     value = _gh_request_value("pr view", "number", timeout=timeout)
@@ -483,8 +545,12 @@ def get_unresolved_pull_request_comments(
     hostname: str | None = None,
     timeout: float = 30,
 ) -> list[dict[str, Any]]:
-    """Return unresolved PR review comments using gh, including replies."""
+    """Return unresolved review comments for open PRs only, including replies."""
     parts = _validate_pull_request(repo, pr_number)
+    repository_url = "repos/" + "/".join(quote(part, safe="") for part in parts)
+    pr = _gh_request_json(hostname, timeout, f"{repository_url}/pulls/{pr_number}")
+    if pr["state"] != "open":
+        return []
     return _get_unresolved_comments(hostname, timeout, parts[0], parts[1], pr_number)
 
 
