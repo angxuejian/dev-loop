@@ -169,52 +169,55 @@ def main() -> None:
     pr_number = github_api.get_current_pull_request_number()
     print(f"Checking PR #{pr_number} in {repo}.", flush=True)
     while True:
-        print("Waiting 60 seconds before checking workflows.", flush=True)
-        time.sleep(60)
-        if not github_api.has_pending_pull_request_workflows(
+        while True:
+            print("Waiting 60 seconds before checking workflows.", flush=True)
+            time.sleep(60)
+            if not github_api.has_pending_pull_request_workflows(
+                repo,
+                pr_number,
+                own_run_id=os.environ.get("GITHUB_RUN_ID", ""),
+            ):
+                break
+        print("All PR workflows have finished.", flush=True)
+        print("Fetching unresolved review comments...", flush=True)
+        comments = github_api.get_unresolved_pull_request_comments(
             repo,
             pr_number,
-            own_run_id=os.environ.get("GITHUB_RUN_ID", ""),
-        ):
-            break
-    print("All PR workflows have finished.", flush=True)
-    print("Fetching unresolved review comments...", flush=True)
-    comments = github_api.get_unresolved_pull_request_comments(
-        repo,
-        pr_number,
-    )
-    if not comments:
-        print("No unresolved review comments; stopping.")
-        return
-    print(f"Found {len(comments)} unresolved review comment(s):", flush=True)
-    for index, comment in enumerate(comments, start=1):
-        print(
-            f"Processing comment {index}/{len(comments)} "
-            f"(id={comment.get('databaseId')}).",
-            flush=True,
         )
-        comment_id = comment.get("databaseId")
-        if type(comment_id) is not int or comment_id <= 0:
-            raise SystemExit(
-                "Invalid comment databaseId; no changes submitted or comments resolved."
+        if not comments:
+            print("No unresolved review comments; stopping.")
+            return
+        print(f"Found {len(comments)} unresolved review comment(s):", flush=True)
+        for index, comment in enumerate(comments, start=1):
+            print(
+                f"Processing comment {index}/{len(comments)} "
+                f"(id={comment.get('databaseId')}).",
+                flush=True,
             )
-        if not run_codex_fix(comment):
-            raise SystemExit(
-                "Fix failed; local changes retained, no changes submitted or comments resolved."
+            comment_id = comment.get("databaseId")
+            if type(comment_id) is not int or comment_id <= 0:
+                raise SystemExit(
+                    "Invalid comment databaseId; no changes submitted or comments resolved."
+                )
+            if not run_codex_fix(comment):
+                raise SystemExit(
+                    "Fix failed; local changes retained, no changes submitted or comments resolved."
+                )
+        if not run_codex_commit():
+            raise SystemExit("Submission failed; comments remain unresolved.")
+        for comment in comments:
+            comment_id = comment["databaseId"]
+            resolved = github_api.resolve_pull_request_comment(
+                repo,
+                pr_number,
+                comment_id,
             )
-    if not run_codex_commit():
-        raise SystemExit("Submission failed; comments remain unresolved.")
-    for comment in comments:
-        comment_id = comment["databaseId"]
-        resolved = github_api.resolve_pull_request_comment(
-            repo,
-            pr_number,
-            comment_id,
-        )
-        print(
-            f"Resolved comment {comment_id}: isResolved={resolved.get('isResolved')}.",
-            flush=True,
-        )
+            if resolved.get("isResolved") is not True:
+                raise SystemExit(f"Failed to resolve comment {comment_id}; stopping.")
+            print(
+                f"Resolved comment {comment_id}: isResolved={resolved.get('isResolved')}.",
+                flush=True,
+            )
 
 
 if __name__ == "__main__":
